@@ -32,15 +32,26 @@ export default function CustomerUpload() {
     calculatePrice();
   }, [settings, shopId, selectedFiles.length]);
 
-  const handleFileChange = (e) => {
+ const handleFileChange = (e) => {
     if (e.target.files) {
       // NodeList ko Array me convert karna
       const filesArray = Array.from(e.target.files);
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB in bytes
+
+      // Check karna ki kya koi bhi file 10 MB se badi hai
+      const isFileTooLarge = filesArray.some(file => file.size > MAX_FILE_SIZE);
+
+      if (isFileTooLarge) {
+        alert("❌ Error: Aapki file 10 MB se badi hai!\n\nTrial version me sirf 10 MB tak ki file allowed hai. Kripya choti file select karein.");
+        e.target.value = ''; // Input ko clear kar dega taaki same file dubara select na ho
+        return; // Function yahi rok dega, state update nahi hogi
+      }
+
+      // Agar file size sahi hai, tabhi aage ka process hoga
       setSelectedFiles(filesArray);
       setSettings({ ...settings, pages: 5 }); 
     }
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (selectedFiles.length === 0) return alert("Pehle file(s) upload karein!");
