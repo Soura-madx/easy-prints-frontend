@@ -34,20 +34,36 @@ export default function CustomerUpload() {
 
  const handleFileChange = (e) => {
     if (e.target.files) {
-      // NodeList ko Array me convert karna
       const filesArray = Array.from(e.target.files);
-      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB in bytes
+      
+      // 1. Validation Limits Define Karein
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+      const ALLOWED_TYPES = [
+        'application/pdf', 
+        'image/jpeg', 
+        'image/jpg', 
+        'image/png'
+      ];
 
-      // Check karna ki kya koi bhi file 10 MB se badi hai
+      // 2. File Type Check (Word, Excel, CSV block karega)
+      const hasInvalidType = filesArray.some(file => !ALLOWED_TYPES.includes(file.type));
+      
+      if (hasInvalidType) {
+        alert("❌ Error: Galat File Format!\n\nAbhi sirf PDF aur Images (JPG/PNG) allowed hain. Kripya apni Word ya Excel file ko pehle PDF me Save/Convert karein, fir upload karein.");
+        e.target.value = ''; // Input field clear kar dega
+        return; // Process yahi rok dega
+      }
+
+      // 3. File Size Check (10 MB limit)
       const isFileTooLarge = filesArray.some(file => file.size > MAX_FILE_SIZE);
 
       if (isFileTooLarge) {
-        alert("❌ Error: Aapki file 10 MB se badi hai!\n\nTrial version me sirf 10 MB tak ki file allowed hai. Kripya choti file select karein.");
-        e.target.value = ''; // Input ko clear kar dega taaki same file dubara select na ho
-        return; // Function yahi rok dega, state update nahi hogi
+        alert("❌ Error: File ka size bahut bada hai!\n\nTrial version me ek baar me maximum 10 MB tak ki file allowed hai. Kripya choti file select karein.");
+        e.target.value = ''; 
+        return; 
       }
 
-      // Agar file size sahi hai, tabhi aage ka process hoga
+      // 4. Agar sab sahi hai, tabhi state update hogi
       setSelectedFiles(filesArray);
       setSettings({ ...settings, pages: 5 }); 
     }
@@ -106,7 +122,7 @@ export default function CustomerUpload() {
             <input 
               type="file" 
               multiple 
-              accept=".pdf,.docx,.jpg,.png" 
+              accept=".pdf, .jpg, .jpeg, .png"
               onChange={handleFileChange} 
               className="hidden" 
               id="fileInput"
