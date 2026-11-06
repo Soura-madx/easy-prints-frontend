@@ -60,7 +60,7 @@ export default function CustomerUpload() {
       }
 
       setSelectedFiles(filesArray);
-      setSettings({ ...settings, pages: 5 }); 
+      setSettings({ ...settings, pages: 1 }); 
     }
   };
 
