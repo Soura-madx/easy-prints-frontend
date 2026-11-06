@@ -11,6 +11,7 @@ export default function ShopkeeperDashboard({ shopName }) {
   const [orders, setOrders] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
   const [filter, setFilter] = useState('Pending'); 
+  const [searchQuery, setSearchQuery] = useState(''); // NAYA: Search query state
 
   const uploadLink = `${window.location.origin}/upload/${shopId}`;
 
@@ -49,13 +50,11 @@ export default function ShopkeeperDashboard({ shopName }) {
     try {
       await axios.post('http://localhost:8080/print', { files: filesArray });
       
-      // Update Database - Mark print as completed and payment as Paid
       await axios.put(`https://easy-prints-backend-1npm-install.onrender.com/api/orders/${orderId}/status`, { 
         status: 'Completed',
-        paymentUpdate: 'Paid' // Backend update ke liye flag (optional but good practice)
+        paymentUpdate: 'Paid' 
       });
       
-      // UI Update - Mark Completed & Paid immediately
       setOrders(orders.map(order => 
         order._id === orderId 
           ? { ...order, status: 'Completed', payment: { ...order.payment, paymentStatus: 'Paid' } } 
@@ -67,9 +66,24 @@ export default function ShopkeeperDashboard({ shopName }) {
     }
   };
 
+  // NAYA: Filter & Search Logic Combined
   const filteredOrders = orders.filter(o => {
-    if (filter === 'All') return true;
-    return o.status === filter;
+    // 1. Status Filter Check
+    if (filter !== 'All' && o.status !== filter) return false;
+
+    // 2. Search Query Check
+    if (searchQuery.trim() !== '') {
+      const query = searchQuery.toLowerCase();
+      
+      const matchToken = o.tokenNumber?.toLowerCase().includes(query);
+      const matchName = o.customerName?.toLowerCase().includes(query);
+      const matchFileName = o.files?.some(f => f.fileName.toLowerCase().includes(query));
+
+      // Agar teeno me se kuch bhi match nahi hua, toh hide kardo
+      if (!matchToken && !matchName && !matchFileName) return false;
+    }
+
+    return true;
   });
 
   return (
@@ -114,7 +128,7 @@ export default function ShopkeeperDashboard({ shopName }) {
       {/* 2. MAIN CONTENT AREA */}
       <div className="flex-1 p-4 md:p-8 h-screen overflow-y-auto">
         
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-white">{shopName || "My Print Shop"} Dashboard</h1>
             <p className="text-gray-400 mt-1">Manage all your print orders here</p>
@@ -126,26 +140,53 @@ export default function ShopkeeperDashboard({ shopName }) {
           </div>
         </div>
 
-        <div className="flex gap-2 mb-6 md:hidden overflow-x-auto pb-2 scrollbar-hide">
-          {['Pending', 'Completed', 'All'].map(f => (
-            <button key={f} onClick={() => setFilter(f)} 
-              className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === f ? 'bg-[#f58025] text-white shadow-lg shadow-orange-500/20' : 'bg-white/10 text-gray-300'}`}>
-              {f}
-            </button>
-          ))}
+        {/* NAYA: Search Bar & Mobile Filters Container */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+          
+          {/* Search Bar */}
+          <div className="relative flex-1">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 text-lg">🔍</span>
+            <input 
+              type="text" 
+              placeholder="Search by Token, Name, or File..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-sm text-white focus:outline-none focus:border-[#f58025] transition-colors shadow-inner"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Mobile Filters (Only visible on small screens) */}
+          <div className="flex gap-2 md:hidden overflow-x-auto pb-2 scrollbar-hide shrink-0 items-center">
+            {['Pending', 'Completed', 'All'].map(f => (
+              <button key={f} onClick={() => setFilter(f)} 
+                className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter === f ? 'bg-[#f58025] text-white shadow-lg shadow-orange-500/20' : 'bg-white/10 text-gray-300'}`}>
+                {f}
+              </button>
+            ))}
+          </div>
         </div>
 
+        {/* Orders Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredOrders.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-24 text-gray-500 bg-white/5 rounded-3xl border border-white/10 border-dashed">
               <span className="text-6xl mb-4">📭</span>
-              <p className="text-xl font-medium">No {filter.toLowerCase()} orders right now.</p>
-              <p className="text-sm mt-2">New orders will appear here automatically.</p>
+              <p className="text-xl font-medium">
+                {searchQuery ? "No matching orders found." : `No ${filter.toLowerCase()} orders right now.`}
+              </p>
+              {!searchQuery && <p className="text-sm mt-2">New orders will appear here automatically.</p>}
             </div>
           ) : (
             filteredOrders.map((order) => {
               
-              // Helper constants for payment check
               const isCashPending = order.payment?.paymentMethod === 'Cash' && order.payment?.paymentStatus === 'Pending';
               
               return (
@@ -159,6 +200,9 @@ export default function ShopkeeperDashboard({ shopName }) {
                     <h3 className={`text-4xl font-black ${order.status === 'Completed' ? 'text-green-400' : 'text-[#f58025]'}`}>
                       {order.tokenNumber || '---'}
                     </h3>
+                    <p className="text-sm text-gray-300 mt-1 truncate max-w-[120px]" title={order.customerName}>
+                      👤 {order.customerName}
+                    </p>
                   </div>
                   <div className="text-right">
                     {/* Dynamic Payment Badge */}
