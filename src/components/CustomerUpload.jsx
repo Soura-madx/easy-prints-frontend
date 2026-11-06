@@ -218,15 +218,16 @@ export default function CustomerUpload() {
             </select>
           </div>
 
-          <div className="bg-[#005596]/30 p-4 rounded-lg mt-4 border border-[#005596]">
-            <div className="flex justify-between items-center text-sm text-gray-300">
-              <span>Handling Fee (2%)</span>
-              <span>₹{price.gatewayFee || "0.00"}</span>
-            </div>
-            <div className="flex justify-between items-center text-xl font-bold mt-2">
-              <span>Total Pay</span>
+          <div className="bg-[#005596]/30 p-5 rounded-lg mt-4 border border-[#005596] shadow-inner">
+            <div className="flex justify-between items-center text-2xl font-bold">
+              <span>Total Amount</span>
               <span className="text-[#f58025]">₹{price.finalAmountToPay || "0.00"}</span>
             </div>
+            {price.discountAmount > 0 && (
+              <p className="text-xs text-green-400 mt-1 text-right">
+                🎉 Bulk discount applied!
+              </p>
+            )}
           </div>
 
           {/* 2 ALAG BUTTONS FOR SUBMISSION */}
