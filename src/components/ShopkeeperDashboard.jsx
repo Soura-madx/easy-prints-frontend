@@ -36,7 +36,6 @@ export default function ShopkeeperDashboard({ shopName }) {
       audio.play().catch(e => console.log('Audio blocked'));
     });
 
-    // Har 1 min me page fetch karega taaki 10 min purane completed orders clean ho jayein
     const interval = setInterval(fetchOrders, 60000);
 
     return () => {
@@ -48,15 +47,19 @@ export default function ShopkeeperDashboard({ shopName }) {
 
   const handlePrintClick = async (orderId, filesArray) => {
     try {
-      // 1. Agent ko print command bhejna
       await axios.post('http://localhost:8080/print', { files: filesArray });
       
-      // 2. Database me status 'Completed' karna
-      await axios.put(`https://easy-prints-backend-1npm-install.onrender.com/api/orders/${orderId}/status`, { status: 'Completed' });
+      // Update Database - Mark print as completed and payment as Paid
+      await axios.put(`https://easy-prints-backend-1npm-install.onrender.com/api/orders/${orderId}/status`, { 
+        status: 'Completed',
+        paymentUpdate: 'Paid' // Backend update ke liye flag (optional but good practice)
+      });
       
-      // 3. UI me bina gayab kiye usko turant green/completed mark kar dena
+      // UI Update - Mark Completed & Paid immediately
       setOrders(orders.map(order => 
-        order._id === orderId ? { ...order, status: 'Completed' } : order
+        order._id === orderId 
+          ? { ...order, status: 'Completed', payment: { ...order.payment, paymentStatus: 'Paid' } } 
+          : order
       ));
       
     } catch (error) {
@@ -111,7 +114,6 @@ export default function ShopkeeperDashboard({ shopName }) {
       {/* 2. MAIN CONTENT AREA */}
       <div className="flex-1 p-4 md:p-8 h-screen overflow-y-auto">
         
-        {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white">{shopName || "My Print Shop"} Dashboard</h1>
@@ -124,7 +126,6 @@ export default function ShopkeeperDashboard({ shopName }) {
           </div>
         </div>
 
-        {/* Mobile Filters */}
         <div className="flex gap-2 mb-6 md:hidden overflow-x-auto pb-2 scrollbar-hide">
           {['Pending', 'Completed', 'All'].map(f => (
             <button key={f} onClick={() => setFilter(f)} 
@@ -134,7 +135,6 @@ export default function ShopkeeperDashboard({ shopName }) {
           ))}
         </div>
 
-        {/* Orders Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredOrders.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-24 text-gray-500 bg-white/5 rounded-3xl border border-white/10 border-dashed">
@@ -143,23 +143,34 @@ export default function ShopkeeperDashboard({ shopName }) {
               <p className="text-sm mt-2">New orders will appear here automatically.</p>
             </div>
           ) : (
-            filteredOrders.map((order) => (
+            filteredOrders.map((order) => {
+              
+              // Helper constants for payment check
+              const isCashPending = order.payment?.paymentMethod === 'Cash' && order.payment?.paymentStatus === 'Pending';
+              
+              return (
               <div key={order._id} 
                 className={`rounded-2xl p-5 border transition-all duration-300 flex flex-col h-full ${order.status === 'Completed' ? 'bg-green-900/10 border-green-500/30' : 'bg-white/5 border-[#005596]/50 hover:border-[#f58025] hover:shadow-xl hover:shadow-orange-500/10'}`}>
                 
-                {/* Card Header: Token Number */}
+                {/* Card Header */}
                 <div className="flex justify-between items-start mb-4 border-b border-white/10 pb-4">
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 font-semibold">Token Number</p>
                     <h3 className={`text-4xl font-black ${order.status === 'Completed' ? 'text-green-400' : 'text-[#f58025]'}`}>
                       {order.tokenNumber || '---'}
                     </h3>
-                    <p className="text-sm text-gray-300 mt-1">👤 {order.customerName}</p>
                   </div>
                   <div className="text-right">
-                    <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${order.status === 'Completed' ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400 animate-pulse'}`}>
-                      {order.status}
-                    </span>
+                    {/* Dynamic Payment Badge */}
+                    {isCashPending ? (
+                      <span className="text-xs font-bold px-3 py-1 rounded-full uppercase bg-red-500/20 text-red-400 animate-pulse border border-red-500/30">
+                        ⚠️ Cash Pending
+                      </span>
+                    ) : (
+                      <span className="text-xs font-bold px-3 py-1 rounded-full uppercase bg-green-500/20 text-green-400">
+                        ✅ Paid {order.payment?.paymentMethod || ''}
+                      </span>
+                    )}
                     <p className="text-lg font-bold mt-2">₹{order.payment?.finalPaidAmount || "0.00"}</p>
                   </div>
                 </div>
@@ -177,7 +188,6 @@ export default function ShopkeeperDashboard({ shopName }) {
                         </a>
                       </div>
                       
-                      {/* Configuration Tags */}
                       <div className="flex flex-wrap gap-1 mt-1">
                         <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300">{fileItem.settings?.paperSize}</span>
                         <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded text-gray-300">{fileItem.settings?.color}</span>
@@ -194,9 +204,15 @@ export default function ShopkeeperDashboard({ shopName }) {
                     <button 
                       onClick={() => handlePrintClick(order._id, order.files)} 
                       disabled={!isConnected}
-                      className={`w-full font-bold py-3.5 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 ${isConnected ? 'bg-[#f58025] hover:bg-orange-600 text-white shadow-orange-500/20' : 'bg-gray-600 text-gray-300 cursor-not-allowed'}`}
+                      className={`w-full font-bold py-3.5 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2 ${
+                        !isConnected ? 'bg-gray-600 text-gray-300 cursor-not-allowed' : 
+                        isCashPending ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20' : 
+                        'bg-[#f58025] hover:bg-orange-600 text-white shadow-orange-500/20'
+                      }`}
                     >
-                      🖨️ {isConnected ? 'Print Now' : 'Agent Offline'}
+                      {isConnected 
+                        ? (isCashPending ? `💵 Collect ₹${order.payment?.finalPaidAmount} & Print` : '🖨️ Print Now') 
+                        : 'Agent Offline'}
                     </button>
                   ) : (
                     <div className="w-full bg-green-500/10 text-green-400 text-center font-bold py-3.5 rounded-xl border border-green-500/20 flex items-center justify-center gap-2">
@@ -206,7 +222,7 @@ export default function ShopkeeperDashboard({ shopName }) {
                 </div>
 
               </div>
-            ))
+            )})
           )}
         </div>
       </div>

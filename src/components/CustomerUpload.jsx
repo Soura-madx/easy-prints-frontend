@@ -8,7 +8,7 @@ export default function CustomerUpload() {
   
   // 6 Customization State
   const [settings, setSettings] = useState({
-    pages: 1, // PDF page counter logic ke liye default 1
+    pages: 1, 
     copies: 1,
     color: 'B&W',
     paperSize: 'A4',
@@ -19,7 +19,8 @@ export default function CustomerUpload() {
   
   const [price, setPrice] = useState({ finalAmountToPay: 0, baseAmount: 0, gatewayFee: 0 });
   const [isUploading, setIsUploading] = useState(false);
-  const [tokenDisplay, setTokenDisplay] = useState(null); // Token dikhane ke liye
+  const [tokenDisplay, setTokenDisplay] = useState(null); 
+  const [completedPaymentMode, setCompletedPaymentMode] = useState(''); // Success screen par dikhane ke liye
 
   // Price Calculation trigger
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function CustomerUpload() {
   const handleFileChange = (e) => {
     if (e.target.files) {
       const filesArray = Array.from(e.target.files);
-      const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB limit
+      const MAX_FILE_SIZE = 10 * 1024 * 1024; 
       const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
 
       const hasInvalidType = filesArray.some(file => !ALLOWED_TYPES.includes(file.type));
@@ -59,21 +60,21 @@ export default function CustomerUpload() {
       }
 
       setSelectedFiles(filesArray);
-      setSettings({ ...settings, pages: 5 }); // Dummy pages count as requested
+      setSettings({ ...settings, pages: 5 }); 
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // NAYA: handleSubmit ab mode accept karega ('Online' ya 'Cash')
+  const handleSubmit = async (paymentMode) => {
     if (selectedFiles.length === 0) return alert("Pehle file(s) upload karein!");
     
     setIsUploading(true);
     setTokenDisplay(null);
+    setCompletedPaymentMode(paymentMode); // Success screen ke liye save kar rahe hain
 
     try {
       const uploadedFilesArray = [];
       
-      // Har file ko Cloudinary par upload karna
       for (const file of selectedFiles) {
         const formData = new FormData();
         formData.append('document', file); 
@@ -86,7 +87,6 @@ export default function CustomerUpload() {
         });
       }
       
-      // Order create karna
       const response = await axios.post('https://easy-prints-backend-1npm-install.onrender.com/api/orders/create', {
         shopId: shopId,
         customerName: "Walk-in Customer",
@@ -95,11 +95,11 @@ export default function CustomerUpload() {
           baseAmount: price.baseAmount,
           gatewayFee: price.gatewayFee,
           finalPaidAmount: price.finalAmountToPay,
-          paymentStatus: 'Paid'
+          paymentStatus: paymentMode === 'Cash' ? 'Pending' : 'Paid', // Cash hai toh Pending
+          paymentMethod: paymentMode // Database me method save hoga
         }
       });
 
-      // Success hone par Token dikhana
       setTokenDisplay(response.data.order.tokenNumber);
       setSelectedFiles([]); 
     } catch (error) {
@@ -110,7 +110,7 @@ export default function CustomerUpload() {
     }
   };
 
-  // SUCCESS SCREEN: Agar order ho gaya hai, toh Token Number dikhayein
+  // SUCCESS SCREEN
   if (tokenDisplay) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
@@ -119,12 +119,21 @@ export default function CustomerUpload() {
           <h2 className="text-2xl font-bold mb-2">Order Successful!</h2>
           <p className="text-gray-300 mb-6">Aapki file dukan par bhej di gayi hai.</p>
           
-          <div className="bg-[#f58025]/20 border-2 border-[#f58025] rounded-xl p-6 mb-8">
+          <div className="bg-[#f58025]/20 border-2 border-[#f58025] rounded-xl p-6 mb-6">
             <p className="text-sm text-gray-300 uppercase tracking-wider">Aapka Token Number</p>
             <p className="text-6xl font-black text-[#f58025] mt-2">{tokenDisplay}</p>
           </div>
           
-          <p className="text-sm text-gray-400 mb-6">Counter par apna token number batayein aur print lein.</p>
+          {/* Cash walo ke liye red alert */}
+          {completedPaymentMode === 'Cash' && (
+            <div className="bg-red-500/20 text-red-200 p-4 rounded-xl mb-6 border border-red-500/30 font-medium animate-pulse text-sm">
+              ⚠️ Counter par jakar apna Token number batayein aur ₹{price.finalAmountToPay} dekar print lein.
+            </div>
+          )}
+
+          {!completedPaymentMode || completedPaymentMode === 'Online' && (
+             <p className="text-sm text-gray-400 mb-6">Counter par apna token number batayein aur print lein.</p>
+          )}
           
           <button 
             onClick={() => {
@@ -146,7 +155,8 @@ export default function CustomerUpload() {
       <div className="w-full max-w-lg bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-6 shadow-2xl">
         <h2 className="text-2xl font-bold mb-6 text-center text-[#f58025]">Easy Prints</h2>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Changed from <form onSubmit> to simple <div> since we use buttons directly */}
+        <div className="space-y-4">
           <div className="border-2 border-dashed border-white/30 p-6 text-center rounded-xl hover:border-[#f58025] transition-colors">
             <input 
               type="file" 
@@ -169,16 +179,12 @@ export default function CustomerUpload() {
             </label>
           </div>
 
-          {/* 6 Customization Options Grid */}
           <div className="grid grid-cols-2 gap-3 text-sm">
-            {/* 1. Color */}
             <select className="bg-white/5 border border-white/20 p-2 rounded-lg text-white outline-none cursor-pointer" 
               value={settings.color} onChange={(e) => setSettings({...settings, color: e.target.value})}>
               <option className="text-black" value="B&W">Black & White</option>
               <option className="text-black" value="Color">Color Print</option>
             </select>
-
-            {/* 2. Paper Size */}
             <select className="bg-white/5 border border-white/20 p-2 rounded-lg text-white outline-none cursor-pointer" 
               value={settings.paperSize} onChange={(e) => setSettings({...settings, paperSize: e.target.value})}>
               <option className="text-black" value="A4">A4 (Standard)</option>
@@ -187,34 +193,24 @@ export default function CustomerUpload() {
               <option className="text-black" value="Legal">Legal</option>
               <option className="text-black" value="Letter">Letter</option>
             </select>
-
-            {/* 3. Sides */}
             <select className="bg-white/5 border border-white/20 p-2 rounded-lg text-white outline-none cursor-pointer" 
               value={settings.sides} onChange={(e) => setSettings({...settings, sides: e.target.value})}>
               <option className="text-black" value="single">Single Side</option>
               <option className="text-black" value="both">Both Sides (Duplex)</option>
             </select>
-
-            {/* 4. Copies */}
             <div className="flex items-center justify-between bg-white/5 border border-white/20 p-2 rounded-lg">
               <span className="text-gray-300">Copies:</span>
               <div className="flex gap-2">
-                <button type="button" className="px-2 bg-white/10 hover:bg-white/20 rounded"
-                  onClick={() => setSettings({...settings, copies: Math.max(1, settings.copies - 1)})}>-</button>
+                <button type="button" className="px-2 bg-white/10 hover:bg-white/20 rounded" onClick={() => setSettings({...settings, copies: Math.max(1, settings.copies - 1)})}>-</button>
                 <span className="w-4 text-center">{settings.copies}</span>
-                <button type="button" className="px-2 bg-white/10 hover:bg-white/20 rounded"
-                  onClick={() => setSettings({...settings, copies: settings.copies + 1})}>+</button>
+                <button type="button" className="px-2 bg-white/10 hover:bg-white/20 rounded" onClick={() => setSettings({...settings, copies: settings.copies + 1})}>+</button>
               </div>
             </div>
-
-            {/* 5. Orientation */}
             <select className="bg-white/5 border border-white/20 p-2 rounded-lg text-white outline-none cursor-pointer" 
               value={settings.orientation} onChange={(e) => setSettings({...settings, orientation: e.target.value})}>
               <option className="text-black" value="portrait">Portrait</option>
               <option className="text-black" value="landscape">Landscape</option>
             </select>
-
-            {/* 6. Scale */}
             <select className="bg-white/5 border border-white/20 p-2 rounded-lg text-white outline-none cursor-pointer" 
               value={settings.scale} onChange={(e) => setSettings({...settings, scale: e.target.value})}>
               <option className="text-black" value="fit">Fit to Page</option>
@@ -233,18 +229,34 @@ export default function CustomerUpload() {
             </div>
           </div>
 
-          <button type="submit" disabled={isUploading || selectedFiles.length === 0}
-            className="w-full bg-[#f58025] hover:bg-orange-600 text-white font-bold py-4 rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-            {isUploading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Processing...
-              </>
-            ) : (
-              'Pay & Print'
-            )}
-          </button>
-        </form>
+          {/* 2 ALAG BUTTONS FOR SUBMISSION */}
+          {isUploading ? (
+             <div className="w-full bg-[#f58025] opacity-50 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2">
+               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+               Processing...
+             </div>
+          ) : (
+            <div className="flex flex-col md:flex-row gap-3 pt-2">
+              <button 
+                type="button" 
+                onClick={() => handleSubmit('Cash')}
+                disabled={selectedFiles.length === 0}
+                className="flex-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold py-3.5 rounded-xl transition-all disabled:opacity-50 flex justify-center items-center gap-2"
+              >
+                💵 Cash on Counter
+              </button>
+              
+              <button 
+                type="button" 
+                onClick={() => handleSubmit('Online')}
+                disabled={selectedFiles.length === 0}
+                className="flex-1 bg-[#f58025] hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50 flex justify-center items-center gap-2"
+              >
+                📱 Pay Online
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
