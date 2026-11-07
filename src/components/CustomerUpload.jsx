@@ -247,14 +247,7 @@ export default function CustomerUpload() {
                 💵 Cash on Counter
               </button>
               
-              <button 
-                type="button" 
-                onClick={() => handleSubmit('Online')}
-                disabled={selectedFiles.length === 0}
-                className="flex-1 bg-[#f58025] hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-orange-500/20 disabled:opacity-50 flex justify-center items-center gap-2"
-              >
-                📱 Pay Online
-              </button>
+              
             </div>
           )}
         </div>
